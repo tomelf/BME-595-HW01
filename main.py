@@ -9,7 +9,7 @@ from scipy import misc
 import numpy as np
 
 def main():
-    input_filename = "test-1920x1080"
+    input_filename = "test-192x108"
     input_image = Image.open("{0}.png".format(input_filename))
     transform = Compose([
         ToTensor(),
@@ -17,7 +17,7 @@ def main():
     input_tensor = transform(input_image.convert('RGB'))
     print input_tensor.size()
 
-    run_parts = [True, False, False]
+    run_parts = [False, True, False]
 
     # PartA
     if run_parts[0]:
@@ -52,7 +52,7 @@ def main():
     if run_parts[1]:
         parameters = []
         running_times = []
-        o_channels = [np.power(2, i) for i in range(11)]
+        o_channels = [np.power(2, i) for i in range(5)]
         for o_channel in o_channels:
             parameters.append({"in_channel": 3, "o_channel": o_channel, "kernel_size": 3, "stride":1, "mode": 'rand'})
         for parameter in parameters:
@@ -67,8 +67,9 @@ def main():
         radius = range(1, len(running_times)+1)
         print radius
         print running_times
+        plt.xlabel('Number of channel')
         plt.ylabel('Conv2D.forward() running time')
-        plt.plot(radius, running_times)
+        plt.plot(radius, running_times, '.')
         plt.show()
 
     # PartC
@@ -89,7 +90,7 @@ def main():
         radius = kernel_sizes
         print radius
         print running_ops
-        fig, ax = plt.subplots()
+        plt.xlabel('Kernel size')
         plt.ylabel('Conv2D.forward() running operations')
         plt.plot(radius, running_ops, '.')
         plt.show()
