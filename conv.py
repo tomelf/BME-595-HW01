@@ -3,15 +3,6 @@ import random
 import torch
 
 class Conv2D:
-    kernel_3s = torch.Tensor([
-        [[-1, -1, -1], [0, 0, 0], [1, 1, 1]],
-        [[-1,  0,  1], [-1, 0, 1], [-1, 0, 1]],
-        [[ 1,  1,  1], [1, 1, 1], [1, 1, 1]]
-    ])
-    kernel_5s = torch.Tensor([
-        [[-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [0, 0, 0, 0, 0], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
-        [[-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1]]
-    ])
     def __init__(self, in_channel, o_channel, kernel_size, stride=1, mode="known"):
         self.in_channel = in_channel
         self.o_channel = o_channel
@@ -19,18 +10,22 @@ class Conv2D:
         self.kernel_size = kernel_size
         self.stride = stride
         if mode == "rand":
-            if kernel_size == 3:
-                selected_idx = torch.LongTensor(random.sample(range(len(self.kernel_3s)), o_channel))
-                self.kernel_to_use = torch.index_select(self.kernel_3s, 0, selected_idx)
-            if kernel_size == 5:
-                selected_idx = torch.LongTensor(random.sample(range(len(self.kernel_5s)), o_channel))
-                self.kernel_to_use = torch.index_select(self.kernel_5s, 0, selected_idx)
+            self.kernel_to_use = torch.randn(o_channel, kernel_size, kernel_size)
         else:
+            kernel_3s = torch.Tensor([
+                [[-1, -1, -1], [0, 0, 0], [1, 1, 1]],
+                [[-1,  0,  1], [-1, 0, 1], [-1, 0, 1]],
+                [[ 1,  1,  1], [1, 1, 1], [1, 1, 1]]
+            ])
+            kernel_5s = torch.Tensor([
+                [[-1, -1, -1, -1, -1], [-1, -1, -1, -1, -1], [0, 0, 0, 0, 0], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]],
+                [[-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1], [-1, -1, 0, 1, 1]]
+            ])
             selected_idx = torch.LongTensor(range(o_channel))
             if kernel_size == 3:
-                self.kernel_to_use = torch.index_select(self.kernel_3s, 0, selected_idx)
+                self.kernel_to_use = torch.index_select(kernel_3s, 0, selected_idx)
             if kernel_size == 5:
-                self.kernel_to_use = torch.index_select(self.kernel_5s, 0, selected_idx)
+                self.kernel_to_use = torch.index_select(kernel_5s, 0, selected_idx)
 
     def forward(self, input_image):
         ops = 0
@@ -41,7 +36,9 @@ class Conv2D:
         ops += 2
         reshape_size = np.power(self.kernel_size, 2)
         ops += 1
-        output_image = torch.FloatTensor(self.o_channel, c, h_output, w_output).zero_()
+        # output_image = torch.FloatTensor(self.o_channel, c, h_output, w_output).zero_()
+        output_image = torch.FloatTensor(self.o_channel, h_output, w_output).zero_()
+        # rgb_weights = [0.2989, 0.5870, 0.1140]
         for kid, kernel in enumerate(self.kernel_to_use):
             kernel_1d = kernel.contiguous().view(reshape_size)
             for i in range(c):
@@ -49,7 +46,11 @@ class Conv2D:
                     for k in range(0, w_output, self.stride):
                         block = input_image[i][j:j+self.kernel_size, k:k+self.kernel_size].contiguous().view(reshape_size)
                         ops += 2
-                        output_image[kid][i][j][k] += torch.dot(kernel_1d, block)
-                        ops += 2 * kernel_1d.size()[0]
-            # torch.div(output_image[kid], c, out=output_image[kid])
+                        # output_image[kid][i][j][k] = torch.dot(kernel_1d, block)
+                        output_image[kid][j][k] = output_image[kid][j][k] + torch.dot(kernel_1d, block)
+                        ops += 2 * kernel_1d.size()[0] + 2
+            torch.add(output_image[kid], -torch.min(output_image[kid]), out=output_image[kid])
+            ops += h_output*w_output
+            torch.div(output_image[kid], torch.max(output_image[kid]), out=output_image[kid])
+            ops += h_output*w_output
         return (ops, output_image)
